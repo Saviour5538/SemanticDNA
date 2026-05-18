@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(cd \"c:\\\\Users\\\\Adarsh\\\\Desktop\\\\POCs\\\\SemanticDNA\"; Start-Process powershell -ArgumentList \"-NoExit\", \"-Command\", \"cd 'c:\\\\Users\\\\Adarsh\\\\Desktop\\\\POCs\\\\SemanticDNA'; uvicorn app.main:app --reload\")",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:8000/search/health\" -Method GET 2>&1)",
+      "PowerShell(Start-Sleep -Seconds 4; try { Invoke-RestMethod -Uri \"http://localhost:8000/search/health\" } catch { Write-Host \"Not up yet: $_\" })",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:8000/search/health\" -UseBasicParsing; Write-Host \"Status: $\\($r.StatusCode\\)\"; Write-Host $r.Content } catch { Write-Host \"Error: $_\" })"
+    ]
+  }
+}

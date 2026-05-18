@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Semantic DNA — Intelligent Search Without Vectors</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:      #FFEBCC;
+      --navy-dark: #FFD8A8;
+      --blue:      #c2410c;
+      --blue-lt:   #ea580c;
+      --white:     #ffffff;
+      --gray-50:   #FFF9D2;
+      --gray-100:  #FFF3E0;
+      --gray-300:  #FFD8A8;
+      --gray-500:  #92400e;
+      --gray-700:  #451a03;
+      --gray-900:  #1c0a03;
+      --green:     #15803d;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--white);
+      color: var(--gray-700);
+      line-height: 1.6;
+    }
+
+    /* ── NAV ─────────────────────────────────────────────── */
+    nav {
+      position: sticky; top: 0; z-index: 200;
+      background: var(--navy);
+      padding: 0 48px; height: 68px;
+      display: flex; align-items: center; justify-content: space-between;
+      box-shadow: 0 2px 16px rgba(180,80,0,0.12);
+      border-bottom: 1px solid var(--navy-dark);
+    }
+
+    .nav-logo {
+      display: flex; align-items: center; gap: 10px;
+      text-decoration: none;
+    }
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg,#c2410c,#d97706);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .nav-logo span { font-size: 1.05rem; font-weight: 700; color: #451a03; }
+
+    .nav-links { display: flex; align-items: center; gap: 28px; list-style: none; }
+    .nav-links a {
+      color: #92400e; text-decoration: none;
+      font-size: 0.875rem; font-weight: 500; transition: color 0.2s;
+    }
+    .nav-links a:hover { color: #451a03; }
+
+    .nav-actions { display: flex; gap: 10px; align-items: center; }
+
+    .status-pill {
+      background: rgba(194,65,12,0.1);
+      border: 1px solid rgba(194,65,12,0.25);
+      color: #c2410c; font-size: 0.72rem; font-weight: 600;
+      padding: 4px 12px; border-radius: 100px;
+    }
+
+    .btn {
+      border: none; border-radius: 7px; font-weight: 600;
+      cursor: pointer; transition: all 0.18s;
+      font-size: 0.875rem; font-family: inherit;
+    }
+    .btn-ghost {
+      background: transparent; color: #7c2d12;
+      border: 1px solid rgba(124,45,18,0.3);
+      padding: 8px 18px;
+    }
+    .btn-ghost:hover { background: rgba(124,45,18,0.07); }
+    .btn-primary-nav {
+      background: #c2410c; color: white; padding: 8px 20px;
+    }
+    .btn-primary-nav:hover { background: #ea580c; transform: translateY(-1px); }
+
+    /* ── HERO ────────────────────────────────────────────── */
+    .hero {
+      background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy) 55%, #FFF9D2 100%);
+      padding: 88px 48px 108px;
+      text-align: center;
+      position: relative; overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='30' cy='30' r='1.5' fill='%23c2410c' fill-opacity='0.06'/%3E%3C/svg%3E");
+      pointer-events: none;
+    }
+
+    .hero-inner { position: relative; max-width: 740px; margin: 0 auto; }
+
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(194,65,12,0.08);
+      border: 1px solid rgba(194,65,12,0.22);
+      color: #9a3412; font-size: 0.76rem; font-weight: 700;
+      padding: 6px 18px; border-radius: 100px;
+      margin-bottom: 28px; letter-spacing: 0.06em;
+    }
+
+    .hero h1 {
+      font-size: 3.1rem; font-weight: 800; color: #1c0a03;
+      line-height: 1.12; margin-bottom: 20px;
+      letter-spacing: -0.03em;
+    }
+    .hero h1 span {
+      background: linear-gradient(90deg, #c2410c, #d97706);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+
+    .hero p {
+      font-size: 1.1rem; color: #92400e;
+      max-width: 560px; margin: 0 auto 40px; line-height: 1.7;
+    }
+
+    .hero-search-wrap {
+      display: flex; max-width: 640px; margin: 0 auto 14px;
+      background: white; border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(180,80,0,0.15); overflow: hidden;
+      border: 1px solid #FFD8A8;
+    }
+    .hero-search-wrap input {
+      flex: 1; border: none; outline: none;
+      padding: 16px 22px; font-size: 1rem;
+      color: var(--gray-700); font-family: inherit;
+    }
+    .hero-search-wrap button {
+      background: #c2410c; color: white; border: none;
+      padding: 16px 28px; font-size: 0.95rem; font-weight: 700;
+      cursor: pointer; transition: background 0.2s; font-family: inherit;
+    }
+    .hero-search-wrap button:hover { background: #ea580c; }
+
+    .hero-hint { font-size: 0.76rem; color: #b45309; }
+
+    .hero-stats {
+      display: flex; justify-content: center; gap: 40px; margin-top: 52px;
+    }
+    .hero-stat { text-align: center; }
+    .hero-stat strong {
+      display: block; font-size: 1.6rem; font-weight: 800; color: #451a03;
+    }
+    .hero-stat span { font-size: 0.78rem; color: #92400e; }
+
+    /* ── SEARCH RESULTS (hero) ───────────────────────────── */
+    #hero-results-section {
+      background: var(--gray-50);
+      padding: 48px 48px 64px;
+      display: none;
+    }
+    #hero-results-section.visible { display: block; }
+    .results-container { max-width: 900px; margin: 0 auto; }
+
+    /* ── SECTIONS ────────────────────────────────────────── */
+    .section { padding: 80px 48px; }
+
+    .section-label {
+      font-size: 0.76rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--blue); margin-bottom: 10px;
+    }
+    .section-title {
+      font-size: 2rem; font-weight: 800;
+      color: var(--gray-900); letter-spacing: -0.02em; margin-bottom: 14px;
+    }
+    .section-sub { font-size: 0.975rem; color: var(--gray-500); max-width: 560px; }
+
+    /* ── HOW IT WORKS ────────────────────────────────────── */
+    .how-section { background: var(--gray-50); }
+    .how-section .sh { text-align: center; margin-bottom: 56px; }
+    .how-section .section-sub { margin: 0 auto; }
+
+    .steps {
+      display: grid; grid-template-columns: repeat(3,1fr);
+      gap: 28px; max-width: 980px; margin: 0 auto;
+    }
+
+    .step-card {
+      background: white; border-radius: 16px; padding: 32px 28px;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.06);
+      text-align: center; border: 1px solid #e8f0fe;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .step-card:hover { transform: translateY(-5px); box-shadow: 0 10px 36px rgba(194,65,12,0.12); }
+
+    .step-num {
+      width: 54px; height: 54px;
+      background: linear-gradient(135deg, #c2410c, #d97706);
+      border-radius: 14px; display: flex; align-items: center;
+      justify-content: center; font-size: 1.4rem; font-weight: 800;
+      color: white; margin: 0 auto 20px;
+    }
+    .step-card h3 { font-size: 1rem; font-weight: 700; color: var(--gray-900); margin-bottom: 10px; }
+    .step-card p  { font-size: 0.855rem; color: var(--gray-500); line-height: 1.65; }
+
+    /* ── FEATURES (5 dimensions) ─────────────────────────── */
+    .features-section { background: white; }
+    .features-section .sh { margin-bottom: 52px; }
+
+    .features-grid {
+      display: grid; grid-template-columns: repeat(5,1fr); gap: 20px;
+    }
+
+    .feature-card {
+      background: var(--gray-50); border-radius: 14px;
+      padding: 28px 18px; border: 1.5px solid #e2e8f0;
+      text-align: center; transition: all 0.2s;
+    }
+    .feature-card:hover {
+      border-color: var(--blue); background: #FFF3E0;
+      transform: translateY(-3px);
+      box-shadow: 0 8px 28px rgba(194,65,12,0.1);
+    }
+
+    .feat-icon {
+      width: 56px; height: 56px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; margin: 0 auto 16px;
+    }
+    .fi-b { background: #FFF3E0; }
+    .fi-g { background: #d1fae5; }
+    .fi-p { background: #ede9fe; }
+    .fi-o { background: #ffedd5; }
+    .fi-r { background: #fee2e2; }
+
+    .feature-card h3 { font-size: 0.88rem; font-weight: 700; color: var(--gray-900); margin-bottom: 8px; }
+    .feature-card p  { font-size: 0.78rem; color: var(--gray-500); line-height: 1.55; }
+
+    .feat-weight {
+      display: inline-block; background: var(--blue); color: white;
+      font-size: 0.7rem; font-weight: 700; padding: 3px 10px;
+      border-radius: 100px; margin-top: 12px;
+    }
+
+    /* ── TECH STACK BAR ──────────────────────────────────── */
+    .stack-bar {
+      background: white; padding: 40px 48px;
+      text-align: center;
+      border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9;
+    }
+    .stack-label {
+      font-size: 0.75rem; color: var(--gray-500); font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 24px;
+    }
+    .stack-logos {
+      display: flex; justify-content: center;
+      align-items: center; gap: 48px; flex-wrap: wrap;
+    }
+    .stack-item {
+      font-size: 0.95rem; font-weight: 700; color: #94a3b8;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    /* ── APP WORKSPACE ───────────────────────────────────── */
+    .app-section { background: var(--gray-50); padding: 80px 48px; }
+    .app-section .sh { text-align: center; margin-bottom: 48px; }
+    .app-section .section-sub { margin: 0 auto; }
+
+    .app-grid {
+      display: grid; grid-template-columns: 360px 1fr;
+      gap: 28px; max-width: 1240px; margin: 0 auto;
+    }
+
+    .app-card {
+      background: white; border-radius: 16px; padding: 28px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+      border: 1px solid #e2e8f0;
+    }
+
+    .app-card-title {
+      font-size: 0.78rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--gray-500); margin-bottom: 20px;
+      display: flex; align-items: center; gap: 8px;
+      padding-bottom: 14px; border-bottom: 1px solid #f1f5f9;
+    }
+
+    /* ── FORM ELEMENTS ───────────────────────────────────── */
+    label {
+      display: block; font-size: 0.8rem; font-weight: 600;
+      color: var(--gray-700); margin-bottom: 6px; margin-top: 16px;
+    }
+    label:first-of-type { margin-top: 0; }
+
+    input[type="text"], textarea {
+      width: 100%; background: var(--gray-50);
+      border: 1.5px solid #e2e8f0; border-radius: 8px;
+      color: var(--gray-700); font-size: 0.875rem;
+      padding: 10px 14px; outline: none;
+      font-family: inherit; transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    input[type="text"]:focus, textarea:focus {
+      border-color: var(--blue); box-shadow: 0 0 0 3px rgba(194,65,12,0.1);
+    }
+    textarea { min-height: 130px; resize: vertical; line-height: 1.5; }
+
+    button {
+      cursor: pointer; border: none; border-radius: 8px;
+      font-size: 0.875rem; font-weight: 600; padding: 10px 18px;
+      transition: all 0.15s; font-family: inherit;
+    }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-ingest {
+      background: var(--blue); color: white;
+      width: 100%; margin-top: 16px; padding: 12px; font-size: 0.9rem;
+    }
+    .btn-ingest:hover:not(:disabled) { background: var(--blue-lt); transform: translateY(-1px); }
+
+    /* tab row */
+    .tab-row { display: flex; gap: 8px; margin-top: 16px; margin-bottom: 4px; }
+    .tab-btn {
+      background: var(--gray-100); border: 1.5px solid #e2e8f0;
+      color: var(--gray-500); font-size: 0.78rem; padding: 6px 14px;
+      border-radius: 6px; cursor: pointer; font-weight: 600;
+    }
+    .tab-btn.active { background: #FFD8A8; color: #7c2d12; border-color: #c2410c; }
+
+    /* upload zone */
+    .upload-zone {
+      border: 2px dashed #cbd5e1; border-radius: 10px;
+      padding: 24px 16px; text-align: center; cursor: pointer;
+      transition: all 0.15s; margin-top: 12px; background: var(--gray-50);
+    }
+    .upload-zone:hover, .upload-zone.dragover { border-color: #c2410c; background: #FFF3E0; }
+    .upload-zone input[type="file"] { display: none; }
+    .upload-hint { font-size: 0.8rem; color: var(--gray-500); }
+    .upload-hint strong { color: var(--blue); }
+    .file-name { font-size: 0.8rem; color: var(--green); margin-top: 6px; font-weight: 600; }
+
+    /* messages */
+    .msg {
+      font-size: 0.8rem; margin-top: 10px; padding: 8px 12px;
+      border-radius: 7px; font-weight: 500;
+    }
+    .msg.success { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+    .msg.error   { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+
+    hr.divider { border: none; border-top: 1px solid #f1f5f9; margin: 20px 0; }
+
+    /* doc list */
+    .doc-item { padding: 10px 0; border-bottom: 1px solid #f8faff; }
+    .doc-item:last-child { border-bottom: none; }
+    .doc-name { font-weight: 600; color: var(--gray-700); font-size: 0.82rem; }
+    .doc-meta { color: var(--gray-500); margin-top: 2px; font-size: 0.76rem; }
+    .doc-genes { color: var(--green); font-weight: 700; }
+
+    /* search bar in app */
+    .app-search-bar {
+      display: flex; gap: 0; margin-bottom: 20px;
+      border: 1.5px solid #e2e8f0; border-radius: 10px; overflow: hidden;
+    }
+    .app-search-bar input {
+      flex: 1; background: white; border: none;
+      padding: 12px 16px; font-size: 0.9rem;
+      border-radius: 0; box-shadow: none;
+    }
+    .app-search-bar input:focus { box-shadow: none; border: none; }
+    .app-search-bar button {
+      background: var(--blue); color: white;
+      border-radius: 0; padding: 12px 22px;
+      font-size: 0.875rem;
+    }
+    .app-search-bar button:hover { background: var(--blue-lt); }
+
+    /* ── RESULTS ─────────────────────────────────────────── */
+    .results-meta {
+      font-size: 0.8rem; color: var(--gray-500);
+      margin-bottom: 20px; padding: 12px 16px;
+      background: #FFF3E0; border-radius: 8px;
+      border: 1px solid #FFD8A8;
+    }
+    .results-meta strong { color: var(--gray-700); }
+
+    .result-card {
+      background: white; border: 1.5px solid #e2e8f0;
+      border-radius: 12px; padding: 20px 24px; margin-bottom: 14px;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .result-card:hover { border-color: #FFD8A8; box-shadow: 0 4px 20px rgba(194,65,12,0.1); }
+
+    .result-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+    .result-title { font-weight: 700; font-size: 0.95rem; color: var(--gray-900); }
+    .result-meta-line { font-size: 0.74rem; color: var(--gray-500); margin-top: 3px; }
+
+    .score-badge {
+      background: linear-gradient(135deg, #c2410c, #d97706);
+      color: white; font-weight: 800; font-size: 0.95rem;
+      padding: 6px 14px; border-radius: 8px; white-space: nowrap;
+    }
+
+    .result-preview { font-size: 0.83rem; color: var(--gray-500); line-height: 1.6; margin-bottom: 12px; }
+
+    .dim-scores { display: none; margin-top: 12px; }
+    .dim-scores.open { display: block; }
+
+    .dim-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .dim-label { font-size: 0.72rem; font-weight: 600; color: var(--gray-500); width: 110px; flex-shrink: 0; }
+    .bar-bg { flex: 1; background: #f1f5f9; border-radius: 4px; height: 7px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s; }
+    .bar-fill.trigram  { background: linear-gradient(90deg,#2563eb,#60a5fa); }
+    .bar-fill.phonetic { background: linear-gradient(90deg,#059669,#34d399); }
+    .bar-fill.pos      { background: linear-gradient(90deg,#7c3aed,#a78bfa); }
+    .bar-fill.depth    { background: linear-gradient(90deg,#d97706,#fbbf24); }
+    .bar-fill.entropy  { background: linear-gradient(90deg,#dc2626,#f87171); }
+    .dim-val { font-size: 0.72rem; font-weight: 700; color: var(--gray-700); width: 38px; text-align: right; }
+
+    .toggle-dims {
+      background: none; border: 1.5px solid #e2e8f0;
+      color: var(--gray-500); font-size: 0.72rem; padding: 4px 10px;
+      border-radius: 5px; font-weight: 600;
+    }
+    .toggle-dims:hover { border-color: var(--blue); color: var(--blue); }
+
+    .empty-state {
+      text-align: center; color: var(--gray-500);
+      padding: 52px 0; font-size: 0.9rem;
+    }
+    .empty-icon { font-size: 2.8rem; margin-bottom: 12px; display: block; opacity: 0.35; }
+
+    /* ── FOOTER ──────────────────────────────────────────── */
+    footer {
+      background: var(--navy-dark); color: #92400e;
+      padding: 40px 48px; text-align: center; font-size: 0.84rem;
+      border-top: 1px solid #FFD8A8;
+    }
+    footer strong { color: #451a03; }
+
+    /* ── SCROLLBAR ───────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<!-- ═══ NAV ═══════════════════════════════════════════════════════════════════ -->
+<nav>
+  <a class="nav-logo" href="#">
+    <div class="logo-icon">🧬</div>
+    <span>Semantic DNA</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#how-it-works">How It Works</a></li>
+    <li><a href="#features">Dimensions</a></li>
+    <li><a href="#app-section">Search</a></li>
+    <li><a href="#app-section">Ingest</a></li>
+  </ul>
+  <div class="nav-actions">
+    <div class="status-pill" id="nav-status">Loading…</div>
+    <button class="btn btn-ghost"
+      onclick="document.getElementById('app-section').scrollIntoView({behavior:'smooth'})">
+      Upload Doc
+    </button>
+    <button class="btn btn-primary-nav"
+      onclick="document.getElementById('hero-search-input').focus();window.scrollTo({top:0,behavior:'smooth'})">
+      Try Search →
+    </button>
+  </div>
+</nav>
+
+<!-- ═══ HERO ══════════════════════════════════════════════════════════════════ -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge">🧬 &nbsp; No Vectors &nbsp;·&nbsp; Pure PostgreSQL &nbsp;·&nbsp; Bio-Inspired</div>
+    <h1>Get More from<br><span>Semantic Search</span></h1>
+    <p>Encode every document as a 5-dimensional semantic genome. Find what you <em>mean</em> — not just what you type. No ML APIs. No vector databases.</p>
+
+    <div class="hero-search-wrap">
+      <input type="text" id="hero-search-input"
+             placeholder="e.g. trigram hash phrase matching…"
+             onkeydown="if(event.key==='Enter') runSearch(false)" />
+      <button onclick="runSearch(false)">Search →</button>
+    </div>
+    <div class="hero-hint">Press Enter or click Search &nbsp;·&nbsp; Try: "phonetic typo tolerance"</div>
+
+    <div class="hero-stats">
+      <div class="hero-stat"><strong id="stat-docs">—</strong><span>Documents Indexed</span></div>
+      <div class="hero-stat"><strong id="stat-vocab">—</strong><span>Vocabulary Terms</span></div>
+      <div class="hero-stat"><strong>5</strong><span>Genome Dimensions</span></div>
+      <div class="hero-stat"><strong>0</strong><span>ML APIs Used</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ HERO RESULTS ═══════════════════════════════════════════════════════════ -->
+<div id="hero-results-section">
+  <div class="results-container">
+    <div id="hero-results-area">
+      <div class="empty-state"><span class="empty-icon">🔍</span>Results will appear here.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ HOW IT WORKS ═══════════════════════════════════════════════════════════ -->
+<section class="section how-section" id="how-it-works">
+  <div class="sh">
+    <div class="section-label">Process</div>
+    <div class="section-title">How Semantic DNA Search Works</div>
+    <p class="section-sub">Three steps from raw text to explainable results — entirely inside PostgreSQL.</p>
+  </div>
+  <div class="steps">
+    <div class="step-card">
+      <div class="step-num">1</div>
+      <h3>Extract Genome</h3>
+      <p>Every document is tokenized into 3-word sliding windows. Each window becomes a 5-dimensional gene encoding its structure, sound, grammar, depth, and rarity.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-num">2</div>
+      <h3>GIN Pre-Filter</h3>
+      <p>PostgreSQL's GIN index narrows millions of documents to ~500 candidates using trigram hash containment queries — no full table scan needed.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-num">3</div>
+      <h3>Score &amp; Rank</h3>
+      <p>Each candidate is scored across all 5 dimensions with configurable weights. Results are fully explainable — you see exactly why each document matched.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 5 DIMENSIONS ════════════════════════════════════════════════════════════ -->
+<section class="section features-section" id="features">
+  <div class="sh">
+    <div class="section-label">The Genome</div>
+    <div class="section-title">5-Dimensional Semantic Encoding</div>
+    <p class="section-sub">Each 3-word window is encoded along five independent axes. Together they form a fingerprint no embedding can replicate.</p>
+  </div>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feat-icon fi-b">🔢</div>
+      <h3>Trigram Hash</h3>
+      <p>MD5 of each 3-word window. Captures exact phrase matches and preserves word order.</p>
+      <span class="feat-weight">40% weight</span>
+    </div>
+    <div class="feature-card">
+      <div class="feat-icon fi-g">🔊</div>
+      <h3>Phonetic Code</h3>
+      <p>Vowel-stripped, consonant-normalized sound skeleton. Matches despite typos and misspellings.</p>
+      <span class="feat-weight">20% weight</span>
+    </div>
+    <div class="feature-card">
+      <div class="feat-icon fi-p">📐</div>
+      <h3>POS Sequence</h3>
+      <p>spaCy grammatical tags per window. Finds docs with the same sentence structure across different vocabularies.</p>
+      <span class="feat-weight">20% weight</span>
+    </div>
+    <div class="feature-card">
+      <div class="feat-icon fi-o">📊</div>
+      <h3>Context Depth</h3>
+      <p>L1–L4 specificity scale. Separates function words from jargon. Matches expert content to expert queries.</p>
+      <span class="feat-weight">10% weight</span>
+    </div>
+    <div class="feature-card">
+      <div class="feat-icon fi-r">📈</div>
+      <h3>Entropy Score</h3>
+      <p>IDF-based rarity scoring. Rare domain-specific terms outweigh common filler words automatically.</p>
+      <span class="feat-weight">10% weight</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ TECH STACK ════════════════════════════════════════════════════════════ -->
+<div class="stack-bar">
+  <div class="stack-label">Powered entirely by open-source tools</div>
+  <div class="stack-logos">
+    <div class="stack-item">🐘 <span>PostgreSQL</span></div>
+    <div class="stack-item">⚡ <span>FastAPI</span></div>
+    <div class="stack-item">🌿 <span>spaCy</span></div>
+    <div class="stack-item">🐍 <span>Python</span></div>
+    <div class="stack-item">📦 <span>psycopg2</span></div>
+  </div>
+</div>
+
+<!-- ═══ APP WORKSPACE ══════════════════════════════════════════════════════════ -->
+<section class="app-section" id="app-section">
+  <div class="sh">
+    <div class="section-label">Workspace</div>
+    <div class="section-title">Ingest &amp; Search</div>
+    <p class="section-sub">Upload your documents and search across them instantly.</p>
+  </div>
+
+  <div class="app-grid">
+
+    <!-- LEFT: Ingest -->
+    <div>
+      <div class="app-card">
+        <div class="app-card-title">📄 Ingest Document</div>
+
+        <label for="doc-title">Document Title (optional)</label>
+        <input type="text" id="doc-title" placeholder="e.g. Neural Networks Overview" />
+
+        <div class="tab-row">
+          <button class="tab-btn active" id="tab-text" onclick="switchTab('text')">Paste Text</button>
+          <button class="tab-btn"        id="tab-file" onclick="switchTab('file')">Upload File</button>
+        </div>
+
+        <div id="pane-text">
+          <label for="doc-content">Content</label>
+          <textarea id="doc-content" placeholder="Paste or type document text here…"></textarea>
+        </div>
+
+        <div id="pane-file" style="display:none;">
+          <div class="upload-zone" id="upload-zone"
+               onclick="document.getElementById('file-input').click()"
+               ondragover="onDragOver(event)"
+               ondragleave="onDragLeave(event)"
+               ondrop="onDrop(event)">
+            <input type="file" id="file-input" accept=".pdf,.txt,.md" onchange="onFileChosen(this)" />
+            <div class="upload-hint">📂 <strong>Click to browse</strong> or drag &amp; drop<br/>PDF · TXT · MD supported</div>
+            <div class="file-name" id="chosen-file"></div>
+          </div>
+        </div>
+
+        <button class="btn-ingest" id="ingest-btn" onclick="ingestDocument()">Ingest Document</button>
+        <div id="ingest-msg"></div>
+      </div>
+
+      <div class="app-card" style="margin-top:20px;">
+        <div class="app-card-title">
+          📚 Indexed Documents
+          <button id="clear-btn" onclick="clearAllDocuments()"
+            style="margin-left:auto;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;
+                   font-size:0.72rem;padding:4px 10px;border-radius:5px;font-weight:600;cursor:pointer;
+                   transition:all 0.15s;">
+            Clear All
+          </button>
+        </div>
+        <div id="doc-list" style="font-size:0.8rem;color:var(--gray-500);">Loading…</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Search -->
+    <div class="app-card">
+      <div class="app-card-title">🔍 Search Documents</div>
+
+      <div class="app-search-bar">
+        <input type="text" id="app-search-input"
+               placeholder="Search across ingested documents…"
+               onkeydown="if(event.key==='Enter') runSearch(true)" />
+        <button onclick="runSearch(true)">Search →</button>
+      </div>
+
+      <div id="app-results-area">
+        <div class="empty-state">
+          <span class="empty-icon">🧬</span>
+          Ingest some documents, then search here.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ════════════════════════════════════════════════════════════════ -->
+<footer>
+  <strong>Semantic DNA Search</strong> — Bio-inspired semantic search without vector embeddings.<br/>
+  Built with FastAPI · PostgreSQL · spaCy · Python &nbsp;|&nbsp; 2025
+</footer>
+
+<!-- ═══ SCRIPT ════════════════════════════════════════════════════════════════ -->
+<script>
+const API = '';
+let _activeTab = 'text';
+
+// ── Health / init ──────────────────────────────────────────────────────────────
+async function fetchHealth() {
+  try {
+    const r = await fetch(`${API}/search/health`);
+    const d = await r.json();
+    document.getElementById('nav-status').textContent =
+      `${d.total_documents} docs · ${d.vocab_size} terms`;
+    document.getElementById('stat-docs').textContent  = d.total_documents;
+    document.getElementById('stat-vocab').textContent = d.vocab_size.toLocaleString();
+  } catch {
+    document.getElementById('nav-status').textContent = 'API offline';
+  }
+}
+
+async function loadDocList() {
+  try {
+    const r    = await fetch(`${API}/documents?page_size=50`);
+    const docs = await r.json();
+    const el   = document.getElementById('doc-list');
+    if (!docs.length) {
+      el.innerHTML = '<div style="padding:12px 0;color:var(--gray-500)">No documents yet.</div>';
+      return;
+    }
+    el.innerHTML = docs.map(d => `
+      <div class="doc-item">
+        <div class="doc-name">#${d.id} ${d.title ? escHtml(d.title) : 'Untitled'}</div>
+        <div class="doc-meta">${escHtml(d.content_preview.substring(0,72))}…
+          &nbsp;<span class="doc-genes">${d.genome_length} genes</span></div>
+      </div>
+    `).join('');
+  } catch {
+    document.getElementById('doc-list').textContent = 'Could not load documents.';
+  }
+}
+
+// ── Tab ────────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  _activeTab = tab;
+  document.getElementById('pane-text').style.display = tab === 'text' ? '' : 'none';
+  document.getElementById('pane-file').style.display = tab === 'file' ? '' : 'none';
+  document.getElementById('tab-text').classList.toggle('active', tab === 'text');
+  document.getElementById('tab-file').classList.toggle('active', tab === 'file');
+}
+
+// ── Upload drag/drop ───────────────────────────────────────────────────────────
+function onFileChosen(input) {
+  document.getElementById('chosen-file').textContent = input.files[0]?.name || '';
+}
+function onDragOver(e) { e.preventDefault(); document.getElementById('upload-zone').classList.add('dragover'); }
+function onDragLeave()  { document.getElementById('upload-zone').classList.remove('dragover'); }
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('dragover');
+  if (e.dataTransfer.files.length) {
+    const inp = document.getElementById('file-input');
+    inp.files = e.dataTransfer.files;
+    onFileChosen(inp);
+  }
+}
+
+// ── Ingest ─────────────────────────────────────────────────────────────────────
+async function ingestDocument() {
+  const title = document.getElementById('doc-title').value.trim();
+  const msgEl = document.getElementById('ingest-msg');
+  const btn   = document.getElementById('ingest-btn');
+
+  btn.disabled = true; btn.textContent = 'Ingesting…'; msgEl.innerHTML = '';
+
+  try {
+    let r, d;
+    if (_activeTab === 'file') {
+      const fi = document.getElementById('file-input');
+      if (!fi.files.length) { showMsg(msgEl,'error','Please choose a file first.'); return; }
+      const form = new FormData();
+      form.append('file', fi.files[0]);
+      if (title) form.append('title', title);
+      r = await fetch(`${API}/documents/upload`, { method:'POST', body:form });
+      d = await r.json();
+      if (!r.ok) throw new Error(d.detail || 'Server error');
+      showMsg(msgEl,'success',`"${escHtml(d.title)}" → ${d.chunks_created} chunk(s) · ${d.total_genes} genes`);
+    } else {
+      const content = document.getElementById('doc-content').value.trim();
+      if (!content) { showMsg(msgEl,'error','Content cannot be empty.'); return; }
+      r = await fetch(`${API}/documents`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ content, title: title || null })
+      });
+      d = await r.json();
+      if (!r.ok) throw new Error(d.detail || 'Server error');
+      showMsg(msgEl,'success',`Document #${d.id} ingested · ${d.genome_length} genes`);
+    }
+    document.getElementById('doc-content').value = '';
+    document.getElementById('doc-title').value   = '';
+    document.getElementById('file-input').value  = '';
+    document.getElementById('chosen-file').textContent = '';
+    await Promise.all([fetchHealth(), loadDocList()]);
+  } catch(e) {
+    showMsg(msgEl,'error',e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Ingest Document';
+  }
+}
+
+// ── Search ─────────────────────────────────────────────────────────────────────
+async function runSearch(fromApp) {
+  const heroQ = document.getElementById('hero-search-input').value.trim();
+  const appQ  = document.getElementById('app-search-input').value.trim();
+  const query = fromApp ? appQ : (heroQ || appQ);
+  if (!query) return;
+
+  document.getElementById('hero-search-input').value = query;
+  document.getElementById('app-search-input').value  = query;
+
+  const heroSec = document.getElementById('hero-results-section');
+  heroSec.classList.add('visible');
+
+  const loading = '<div class="empty-state" style="padding:32px 0">Searching…</div>';
+  document.getElementById('hero-results-area').innerHTML = loading;
+  document.getElementById('app-results-area').innerHTML  = loading;
+
+  try {
+    const r = await fetch(`${API}/search`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ query, limit:10, min_score:0 })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Search failed');
+    const html = buildResults(d);
+    document.getElementById('hero-results-area').innerHTML = html;
+    document.getElementById('app-results-area').innerHTML  = html;
+    if (!fromApp) heroSec.scrollIntoView({ behavior:'smooth', block:'start' });
+  } catch(e) {
+    const err = `<div class="empty-state" style="color:#dc2626">${escHtml(e.message)}</div>`;
+    document.getElementById('hero-results-area').innerHTML = err;
+    document.getElementById('app-results-area').innerHTML  = err;
+  }
+}
+
+function buildResults(data) {
+  const meta = `<div class="results-meta">
+    <strong>${data.results.length} results</strong> for "<em>${escHtml(data.query)}</em>"
+    &nbsp;·&nbsp; ${data.candidates_evaluated} candidates evaluated
+    &nbsp;·&nbsp; query genome: ${data.query_genome_length} genes
+  </div>`;
+
+  if (!data.results.length) {
+    return meta + `<div class="empty-state"><span class="empty-icon">🔍</span>No matching documents found.</div>`;
+  }
+
+  const dims = [
+    { key:'trigram',       label:'Trigram Hash',  cls:'trigram'  },
+    { key:'phonetic',      label:'Phonetic Code', cls:'phonetic' },
+    { key:'pos_sequence',  label:'POS Sequence',  cls:'pos'      },
+    { key:'context_depth', label:'Context Depth', cls:'depth'    },
+    { key:'entropy',       label:'Entropy Score', cls:'entropy'  },
+  ];
+
+  const cards = data.results.map((res, idx) => {
+    const ds   = res.dimension_scores;
+    const bars = dims.map(d => `
+      <div class="dim-row">
+        <div class="dim-label">${d.label}</div>
+        <div class="bar-bg"><div class="bar-fill ${d.cls}" style="width:${Math.round((ds[d.key]||0)*100)}%"></div></div>
+        <div class="dim-val">${((ds[d.key]||0)*100).toFixed(1)}%</div>
+      </div>`).join('');
+
+    const cid = `c${idx}`;
+    return `
+      <div class="result-card">
+        <div class="result-header">
+          <div>
+            <div class="result-title">${res.title ? escHtml(res.title) : 'Untitled'}</div>
+            <div class="result-meta-line">Doc #${res.document_id} &nbsp;·&nbsp; ${res.matched_trigrams} trigrams matched</div>
+          </div>
+          <div class="score-badge">${(res.total_score*100).toFixed(1)}%</div>
+        </div>
+        <div class="result-preview">${escHtml(res.content_preview)}${res.content_preview.length===200?'…':''}</div>
+        <button class="toggle-dims" onclick="toggleDims('${cid}',this)">Show dimension breakdown</button>
+        <div class="dim-scores" id="${cid}">${bars}</div>
+      </div>`;
+  }).join('');
+
+  return meta + cards;
+}
+
+function toggleDims(id, btn) {
+  const open = document.getElementById(id).classList.toggle('open');
+  btn.textContent = open ? 'Hide breakdown' : 'Show dimension breakdown';
+}
+
+function showMsg(el, type, text) {
+  el.innerHTML = `<div class="msg ${type}">${escHtml(text)}</div>`;
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function clearAllDocuments() {
+  if (!confirm('Delete all indexed documents and reset the corpus? This cannot be undone.')) return;
+
+  const btn = document.getElementById('clear-btn');
+  btn.disabled = true;
+  btn.textContent = 'Clearing…';
+
+  try {
+    const r = await fetch(`${API}/documents`, { method: 'DELETE' });
+    if (!r.ok) throw new Error('Failed to clear documents');
+    await Promise.all([fetchHealth(), loadDocList()]);
+  } catch(e) {
+    alert('Error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Clear All';
+  }
+}
+
+fetchHealth();
+loadDocList();
+</script>
+</body>
+</html>
