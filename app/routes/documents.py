@@ -4,8 +4,10 @@ from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 
 from app.database import get_connection, get_cursor
+from app.genome.entropy import update_corpus_stats
+from app.genome.pos_tagger import compute_all_pos_tags
 from app.models import DocumentDetail, DocumentIngest, DocumentResponse, SemanticGene
-from app.search.indexer import ingest_document
+from app.search.indexer import ingest_document, ingest_documents_batch
 
 router = APIRouter()
 
@@ -58,19 +60,31 @@ async def upload_document(
         raise HTTPException(status_code=400, detail="Could not extract any text from the file.")
     effective_title = title or file.filename
     chunks = _chunk_text(content)
+    chunk_titles = [
+        f"{effective_title} — Part {i + 1}" if len(chunks) > 1 else effective_title
+        for i, _ in enumerate(chunks)
+    ]
     doc_ids = []
     total_genes = 0
     with get_connection() as conn:
-        for i, chunk in enumerate(chunks):
-            chunk_title = f"{effective_title} — Part {i + 1}" if len(chunks) > 1 else effective_title
-            doc_id = ingest_document(conn, chunk, chunk_title)
-            doc_ids.append(doc_id)
-            with get_cursor(conn) as cur:
-                cur.execute(
-                    "SELECT semantic_genome FROM documents WHERE id = %s", (doc_id,)
-                )
-                g = cur.fetchone()["semantic_genome"] or []
-                total_genes += len(g)
+        # Fix 1: collect unique tokens across ALL chunks and update corpus_stats
+        # exactly once so IDF doc_count reflects the source document, not chunk count.
+        all_unique_tokens: set[str] = set()
+        for chunk in chunks:
+            toks, _ = compute_all_pos_tags(chunk)
+            all_unique_tokens.update(t.lower() for t in toks if t.isalpha())
+        update_corpus_stats(conn, list(all_unique_tokens))
+
+        # Fix 2: ingest all chunks in one batch (single nlp.pipe pass + one DB stats fetch)
+        doc_ids = ingest_documents_batch(conn, list(zip(chunks, chunk_titles)))
+
+        with get_cursor(conn) as cur:
+            cur.execute(
+                "SELECT semantic_genome FROM documents WHERE id = ANY(%s)",
+                (doc_ids,),
+            )
+            for row in cur.fetchall():
+                total_genes += len(row["semantic_genome"] or [])
     return JSONResponse(
         status_code=201,
         content={

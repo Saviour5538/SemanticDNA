@@ -6,7 +6,7 @@ class Settings(BaseSettings):
 
     database_url: str
     spacy_model: str = "en_core_web_sm"
-    gin_candidate_limit: int = 500
+    gin_candidate_limit: int = 1000
     entropy_smoothing: float = 0.5
 
 
