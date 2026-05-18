@@ -11,9 +11,13 @@ _PAD = "__PAD__"
 # ------------------------------------------------------------------ #
 
 def _filter_spacy_doc(spacy_doc) -> list[tuple[str, str]]:
-    """Extract (token, pos) pairs from a spaCy Doc, dropping spaces/punctuation."""
+    """Extract (lemma, pos) pairs from a spaCy Doc, dropping spaces/punctuation.
+
+    Filter uses the original text (so punctuation is excluded correctly),
+    but stores the lowercase lemma so inflected forms share the same genome.
+    """
     return [
-        (t.text, t.pos_)
+        (t.lemma_.lower(), t.pos_)
         for t in spacy_doc
         if not t.is_space and t.text.strip() and (t.text.isalpha() or "_" in t.text)
     ]

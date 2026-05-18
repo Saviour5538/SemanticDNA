@@ -32,7 +32,7 @@ class DocumentDetail(DocumentResponse):
 class SearchRequest(BaseModel):
     query: str = Field(min_length=1)
     limit: int = Field(default=10, ge=1, le=100)
-    min_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    min_score: float = Field(default=0.05, ge=0.0, le=1.0)
     weights: dict[str, float] | None = None
 
 
@@ -43,6 +43,8 @@ class SearchResult(BaseModel):
     total_score: float
     dimension_scores: dict[str, float]
     matched_trigrams: int
+    chunks_matched: int = 1
+    sub_chunks: list[dict] | None = None
 
 
 class SearchResponse(BaseModel):
@@ -56,3 +58,17 @@ class HealthResponse(BaseModel):
     status: str
     total_documents: int
     vocab_size: int
+
+
+class AnalyticsResponse(BaseModel):
+    total_searches: int
+    zero_result_searches: int
+    avg_latency_ms: int
+    top_queries: list[dict]
+    recent_searches: list[dict]
+
+
+class JobResponse(BaseModel):
+    job_id: str
+    status: str
+    message: str

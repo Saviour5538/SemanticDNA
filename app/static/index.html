@@ -400,7 +400,13 @@
       padding: 6px 14px; border-radius: 8px; white-space: nowrap;
     }
 
-    .result-preview { font-size: 0.83rem; color: var(--gray-500); line-height: 1.6; margin-bottom: 12px; }
+    .result-preview { font-size: 0.83rem; color: var(--gray-500); line-height: 1.6; margin-bottom: 6px; }
+    .result-preview.full-content {
+      background: var(--gray-50); border-radius: 8px;
+      padding: 12px 14px; border: 1px solid var(--gray-300);
+      max-height: 400px; overflow-y: auto;
+      white-space: pre-wrap; color: var(--gray-700);
+    }
 
     .dim-scores { display: none; margin-top: 12px; }
     .dim-scores.open { display: block; }
@@ -414,6 +420,8 @@
     .bar-fill.pos      { background: linear-gradient(90deg,#7c3aed,#a78bfa); }
     .bar-fill.depth    { background: linear-gradient(90deg,#d97706,#fbbf24); }
     .bar-fill.entropy  { background: linear-gradient(90deg,#dc2626,#f87171); }
+    .bar-fill.bm25     { background: linear-gradient(90deg,#0891b2,#22d3ee); }
+    .bar-fill.title    { background: linear-gradient(90deg,#be185d,#f472b6); }
     .dim-val { font-size: 0.72rem; font-weight: 700; color: var(--gray-700); width: 38px; text-align: right; }
 
     .toggle-dims {
@@ -422,6 +430,19 @@
       border-radius: 5px; font-weight: 600;
     }
     .toggle-dims:hover { border-color: var(--blue); color: var(--blue); }
+
+    .sub-chunk-item {
+      padding: 8px 10px; margin-bottom: 6px;
+      background: var(--gray-50); border-radius: 6px;
+      border-left: 3px solid var(--gray-300);
+    }
+    .sub-chunk-title { font-size: 0.76rem; font-weight: 700; color: var(--gray-700); }
+    .sub-chunk-score {
+      float: right; font-size: 0.72rem; font-weight: 700;
+      color: var(--blue); background: rgba(194,65,12,0.08);
+      padding: 1px 7px; border-radius: 10px;
+    }
+    .sub-chunk-preview { font-size: 0.74rem; color: var(--gray-500); margin-top: 4px; line-height: 1.5; }
 
     .empty-state {
       text-align: center; color: var(--gray-500);
@@ -475,7 +496,7 @@
   <div class="hero-inner">
     <div class="hero-badge">🧬 &nbsp; No Vectors &nbsp;·&nbsp; Pure PostgreSQL &nbsp;·&nbsp; Bio-Inspired</div>
     <h1>Get More from<br><span>Semantic Search</span></h1>
-    <p>Encode every document as a 5-dimensional semantic genome. Find what you <em>mean</em> — not just what you type. No ML APIs. No vector databases.</p>
+    <p>Encode every document as a 6-dimensional semantic genome. Find what you <em>mean</em> — not just what you type. No ML APIs. No vector databases.</p>
 
     <div class="hero-search-wrap">
       <input type="text" id="hero-search-input"
@@ -488,7 +509,7 @@
     <div class="hero-stats">
       <div class="hero-stat"><strong id="stat-docs">—</strong><span>Documents Indexed</span></div>
       <div class="hero-stat"><strong id="stat-vocab">—</strong><span>Vocabulary Terms</span></div>
-      <div class="hero-stat"><strong>5</strong><span>Genome Dimensions</span></div>
+      <div class="hero-stat"><strong>6</strong><span>Genome Dimensions</span></div>
       <div class="hero-stat"><strong>0</strong><span>ML APIs Used</span></div>
     </div>
   </div>
@@ -519,12 +540,12 @@
     <div class="step-card">
       <div class="step-num">2</div>
       <h3>GIN Pre-Filter</h3>
-      <p>PostgreSQL's GIN index narrows millions of documents to ~500 candidates using trigram hash containment queries — no full table scan needed.</p>
+      <p>PostgreSQL's GIN index narrows millions of documents to ~1000 candidates using trigram hash containment queries — no full table scan needed.</p>
     </div>
     <div class="step-card">
       <div class="step-num">3</div>
       <h3>Score &amp; Rank</h3>
-      <p>Each candidate is scored across all 5 dimensions with configurable weights. Results are fully explainable — you see exactly why each document matched.</p>
+      <p>Each candidate is scored across all 6 dimensions with configurable weights. Results are fully explainable — you see exactly why each document matched.</p>
     </div>
   </div>
 </section>
@@ -533,39 +554,45 @@
 <section class="section features-section" id="features">
   <div class="sh">
     <div class="section-label">The Genome</div>
-    <div class="section-title">5-Dimensional Semantic Encoding</div>
-    <p class="section-sub">Each 3-word window is encoded along five independent axes. Together they form a fingerprint no embedding can replicate.</p>
+    <div class="section-title">6-Dimensional Semantic Encoding</div>
+    <p class="section-sub">Each 3-word window is encoded along six independent axes. Together they form a fingerprint no embedding can replicate.</p>
   </div>
-  <div class="features-grid">
+  <div class="features-grid" style="grid-template-columns:repeat(3,1fr);gap:20px;max-width:900px;margin:0 auto;">
     <div class="feature-card">
       <div class="feat-icon fi-b">🔢</div>
       <h3>Trigram Hash</h3>
-      <p>MD5 of each 3-word window. Captures exact phrase matches and preserves word order.</p>
-      <span class="feat-weight">40% weight</span>
+      <p>MD5 of each 3-word lemmatized window. Captures exact phrase matches and preserves word order.</p>
+      <span class="feat-weight">35% weight</span>
     </div>
     <div class="feature-card">
       <div class="feat-icon fi-g">🔊</div>
       <h3>Phonetic Code</h3>
       <p>Vowel-stripped, consonant-normalized sound skeleton. Matches despite typos and misspellings.</p>
-      <span class="feat-weight">20% weight</span>
+      <span class="feat-weight">17% weight</span>
     </div>
     <div class="feature-card">
       <div class="feat-icon fi-p">📐</div>
       <h3>POS Sequence</h3>
       <p>spaCy grammatical tags per window. Finds docs with the same sentence structure across different vocabularies.</p>
-      <span class="feat-weight">20% weight</span>
+      <span class="feat-weight">17% weight</span>
     </div>
     <div class="feature-card">
       <div class="feat-icon fi-o">📊</div>
       <h3>Context Depth</h3>
       <p>L1–L4 specificity scale. Separates function words from jargon. Matches expert content to expert queries.</p>
-      <span class="feat-weight">10% weight</span>
+      <span class="feat-weight">9% weight</span>
     </div>
     <div class="feature-card">
       <div class="feat-icon fi-r">📈</div>
       <h3>Entropy Score</h3>
       <p>IDF-based rarity scoring. Rare domain-specific terms outweigh common filler words automatically.</p>
-      <span class="feat-weight">10% weight</span>
+      <span class="feat-weight">9% weight</span>
+    </div>
+    <div class="feature-card">
+      <div class="feat-icon" style="background:#e0f2fe;">🏆</div>
+      <h3>BM25 (TF-IDF)</h3>
+      <p>PostgreSQL ts_rank keyword relevance. Acts as a vocabulary gate — no match without lexical overlap.</p>
+      <span class="feat-weight">13% weight</span>
     </div>
   </div>
 </section>
@@ -751,7 +778,10 @@ async function ingestDocument() {
       r = await fetch(`${API}/documents/upload`, { method:'POST', body:form });
       d = await r.json();
       if (!r.ok) throw new Error(d.detail || 'Server error');
-      showMsg(msgEl,'success',`"${escHtml(d.title)}" → ${d.chunks_created} chunk(s) · ${d.total_genes} genes`);
+      // 202 = async job started; poll until done
+      showMsg(msgEl,'success',`⏳ ${escHtml(d.message)}`);
+      btn.textContent = 'Processing…';
+      await pollJob(d.job_id, msgEl);
     } else {
       const content = document.getElementById('doc-content').value.trim();
       if (!content) { showMsg(msgEl,'error','Content cannot be empty.'); return; }
@@ -773,6 +803,26 @@ async function ingestDocument() {
   } finally {
     btn.disabled = false; btn.textContent = 'Ingest Document';
   }
+}
+
+async function pollJob(jobId, msgEl) {
+  for (let i = 0; i < 120; i++) {
+    await new Promise(r => setTimeout(r, 1500));
+    try {
+      const r = await fetch(`${API}/documents/jobs/${jobId}`);
+      const j = await r.json();
+      if (j.status === 'done') {
+        showMsg(msgEl,'success',`"${escHtml(j.title)}" → ${j.chunks_created} chunk(s) · ${j.total_genes} genes`);
+        await Promise.all([fetchHealth(), loadDocList()]);
+        return;
+      }
+      if (j.status === 'error') {
+        showMsg(msgEl,'error', j.error || 'Ingest failed');
+        return;
+      }
+    } catch { /* retry */ }
+  }
+  showMsg(msgEl,'error','Timed out waiting for ingest to complete.');
 }
 
 // ── Search ─────────────────────────────────────────────────────────────────────
@@ -827,6 +877,8 @@ function buildResults(data) {
     { key:'pos_sequence',  label:'POS Sequence',  cls:'pos'      },
     { key:'context_depth', label:'Context Depth', cls:'depth'    },
     { key:'entropy',       label:'Entropy Score', cls:'entropy'  },
+    { key:'bm25',          label:'BM25 (TF-IDF)', cls:'bm25'     },
+    { key:'title_boost',   label:'Title Boost',   cls:'title'    },
   ];
 
   const cards = data.results.map((res, idx) => {
@@ -838,28 +890,66 @@ function buildResults(data) {
         <div class="dim-val">${((ds[d.key]||0)*100).toFixed(1)}%</div>
       </div>`).join('');
 
-    const cid = `c${idx}`;
     return `
       <div class="result-card">
         <div class="result-header">
           <div>
             <div class="result-title">${res.title ? escHtml(res.title) : 'Untitled'}</div>
-            <div class="result-meta-line">Doc #${res.document_id} &nbsp;·&nbsp; ${res.matched_trigrams} trigrams matched</div>
+            <div class="result-meta-line">Doc #${res.document_id} &nbsp;·&nbsp; ${res.matched_trigrams} trigrams matched${res.chunks_matched > 1 ? ` &nbsp;·&nbsp; <span style="color:#c2410c;font-weight:700">${res.chunks_matched} chunks matched</span>` : ''}</div>
           </div>
           <div class="score-badge">${(res.total_score*100).toFixed(1)}%</div>
         </div>
-        <div class="result-preview">${escHtml(res.content_preview)}${res.content_preview.length===200?'…':''}</div>
-        <button class="toggle-dims" onclick="toggleDims('${cid}',this)">Show dimension breakdown</button>
-        <div class="dim-scores" id="${cid}">${bars}</div>
+        <div class="result-preview">${escHtml(res.content_preview)}</div>
+        <button class="toggle-dims" style="margin-bottom:6px" onclick="viewFull(${res.document_id}, this)">View full content ▾</button>
+        <button class="toggle-dims" onclick="toggleDims(this)">Show breakdown ▾</button>
+        <div class="dim-scores">${bars}</div>
+        ${res.sub_chunks && res.sub_chunks.length ? `
+        <div class="sub-chunks-wrap">
+          <button class="toggle-dims" style="margin-top:6px" onclick="toggleDims(this)">Show ${res.sub_chunks.length} other chunk(s) ▾</button>
+          <div class="dim-scores">
+            ${res.sub_chunks.map(c => `
+              <div class="sub-chunk-item">
+                <span class="sub-chunk-title">${escHtml(c.title || 'Untitled')}</span>
+                <span class="sub-chunk-score">${(c.total_score*100).toFixed(1)}%</span>
+                <div class="sub-chunk-preview">${escHtml(c.content_preview)}</div>
+              </div>`).join('')}
+          </div>
+        </div>` : ''}
       </div>`;
   }).join('');
 
   return meta + cards;
 }
 
-function toggleDims(id, btn) {
-  const open = document.getElementById(id).classList.toggle('open');
-  btn.textContent = open ? 'Hide breakdown' : 'Show dimension breakdown';
+function toggleDims(btn) {
+  const dimDiv = btn.nextElementSibling;
+  const open = dimDiv.classList.toggle('open');
+  btn.textContent = open
+    ? btn.textContent.replace('Show', 'Hide').replace('▾', '▴')
+    : btn.textContent.replace('Hide', 'Show').replace('▴', '▾');
+}
+
+async function viewFull(docId, btn) {
+  const previewEl = btn.previousElementSibling;
+  if (btn.dataset.expanded === 'true') {
+    btn.dataset.expanded = 'false';
+    btn.textContent = 'View full content ▾';
+    previewEl.classList.remove('full-content');
+    previewEl.textContent = btn.dataset.preview;
+    return;
+  }
+  btn.textContent = 'Loading…';
+  try {
+    const r = await fetch(`${API}/documents/${docId}`);
+    const d = await r.json();
+    btn.dataset.preview = previewEl.textContent.replace(/…$/, '');
+    btn.dataset.expanded = 'true';
+    btn.textContent = 'Collapse ▴';
+    previewEl.classList.add('full-content');
+    previewEl.textContent = d.content;
+  } catch {
+    btn.textContent = 'View full content ▾';
+  }
 }
 
 function showMsg(el, type, text) {

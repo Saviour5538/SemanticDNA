@@ -39,6 +39,31 @@ def update_corpus_stats(conn, unique_tokens: list[str]) -> None:
         )
 
 
+def decrement_corpus_stats(conn, unique_tokens: list[str]) -> None:
+    """Decrement doc_count for each token and decrement total_docs.
+
+    Called on document delete so IDF stays accurate. Removes tokens
+    whose doc_count would drop to zero to keep corpus_stats clean.
+    """
+    if not unique_tokens:
+        return
+    with conn.cursor() as cur:
+        psycopg2.extras.execute_batch(
+            cur,
+            """
+            UPDATE corpus_stats
+               SET doc_count  = GREATEST(doc_count - 1, 0),
+                   updated_at = NOW()
+             WHERE token = %s
+            """,
+            [(t,) for t in unique_tokens],
+        )
+        cur.execute("DELETE FROM corpus_stats WHERE doc_count = 0")
+        cur.execute(
+            "UPDATE corpus_meta SET total_docs = GREATEST(total_docs - 1, 0) WHERE id = 1"
+        )
+
+
 def fetch_corpus_stats(
     conn, tokens: list[str]
 ) -> tuple[dict[str, int], int]:

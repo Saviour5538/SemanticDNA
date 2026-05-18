@@ -2,7 +2,7 @@
 
 > **Bio-inspired semantic search without vector embeddings — built entirely on PostgreSQL.**
 
-A novel approach to semantic search that encodes every document as a **semantic genome** — an array of 5-dimensional gene objects, one per 3-word sliding window. Search is a two-phase pipeline: fast GIN index pre-filtering followed by transparent, weighted multi-dimensional scoring. No ML APIs. No vector databases. Pure SQL.
+A novel approach to semantic search that encodes every document as a **semantic genome** — an array of 6-dimensional gene objects, one per 3-word sliding window. Search is a two-phase pipeline: fast GIN index pre-filtering followed by transparent, weighted multi-dimensional scoring. No ML APIs. No vector databases. Pure SQL.
 
 ---
 
@@ -10,7 +10,7 @@ A novel approach to semantic search that encodes every document as a **semantic 
 
 - [Overview](#overview)
 - [The Core Concept](#the-core-concept)
-- [The 5 Genome Dimensions](#the-5-genome-dimensions)
+- [The 6 Genome Dimensions](#the-6-genome-dimensions)
 - [Architecture](#architecture)
 - [Project Structure](#project-structure)
 - [Prerequisites](#prerequisites)
@@ -37,12 +37,13 @@ Traditional semantic search collapses text into opaque fixed-length vectors via 
 | Word order lost in compression | Word order preserved via trigrams |
 | Requires vector database | Standard PostgreSQL |
 | GPU resources for embedding | Runs on any machine |
+| Re-embed entire corpus on model upgrade | Incremental corpus stats update |
 
 ---
 
 ## The Core Concept
 
-Just as biological DNA encodes life using 4 nucleotides in sequences, Semantic DNA encodes text meaning using 5 dimensions in sliding 3-word windows.
+Just as biological DNA encodes life using 4 nucleotides in sequences, Semantic DNA encodes text meaning using 6 dimensions in sliding 3-word windows.
 
 ```
 "neural networks need computing power"
@@ -58,21 +59,23 @@ Just as biological DNA encodes life using 4 nucleotides in sequences, Semantic D
 │  Window 2: [networks, need, computing]              │
 │  → ...                                              │
 └─────────────────────────────────────────────────────┘
+         +
+  BM25 (ts_rank) scored separately per document
 ```
 
-Each document's genome is stored as a JSONB array in PostgreSQL with a GIN index for sub-millisecond pre-filtering.
+Each document's genome is stored as a JSONB array in PostgreSQL with a GIN index for fast pre-filtering.
 
 ---
 
-## The 5 Genome Dimensions
+## The 6 Genome Dimensions
 
-### 1. Trigram Hash — `40% weight`
-MD5 of each 3-word window (first 12 hex chars). Captures exact phrase matches and preserves word order.
+### 1. Trigram Hash — `35% weight`
+MD5 of each 3-word window (first 12 hex chars). Captures exact phrase matches and preserves word order. Uses lemmatized tokens so "running" and "ran" share the same hash.
 
 - `"the quick brown"` → MD5 → `"4f2a1c9b8e3d"`
 - Unlike vectors: `"quick brown fox"` will **never** accidentally match `"brown quick fox"`
 
-### 2. Phonetic Code — `20% weight`
+### 2. Phonetic Code — `17% weight`
 Vowel-stripped, consonant-normalized sound skeleton. Enables typo and misspelling tolerance.
 
 **Transformations applied (in order):**
@@ -86,12 +89,12 @@ UPPERCASE result
 
 **Example:** `"Pharmacokinetics"` and `"Farmakokenetics"` both → `"FRMKKNTKS"`
 
-### 3. POS Sequence — `20% weight`
+### 3. POS Sequence — `17% weight`
 spaCy Universal POS tags per window, stored as `"DET-ADJ-NOUN"` strings. Finds documents with the same grammatical structure even across completely different vocabularies.
 
 **Example:** `"The huge lion"` and `"A big bear"` both → `"DET-ADJ-NOUN"` → 100% match
 
-### 4. Context Depth — `10% weight`
+### 4. Context Depth — `9% weight`
 Hierarchical specificity score (1–4) per word, averaged across the window.
 
 | Level | Category | Examples |
@@ -103,12 +106,24 @@ Hierarchical specificity score (1–4) per word, averaged across the window.
 
 Ensures expert queries match expert documents and introductory queries match introductory content.
 
-### 5. Entropy Score — `10% weight`
+### 5. Entropy Score — `9% weight`
 IDF-based rarity scoring: `log((N + 1) / (df(t) + smoothing))`
 
 - Common words (`"the"`, `"use"`) → low entropy → low weight
 - Rare technical terms (`"CRISPR"`, `"XLA"`) → high entropy → high weight
 - Corpus stats updated at every document ingest — no retraining needed
+- Corpus stats decremented when a document is deleted
+
+### 6. BM25 — `13% weight`
+PostgreSQL `ts_rank` on a functional GIN index over `to_tsvector('english', title || content)`. Provides strong keyword relevance signal and ensures documents with no vocabulary overlap with the query are filtered out via the **vocabulary signal gate**.
+
+**Vocabulary signal gate:** A result is dropped entirely if all of the following are zero:
+- Trigram overlap
+- Phonetic overlap (≤ 0.05)
+- BM25 score (≤ 0.01)
+- Title boost
+
+This prevents grammatically-similar but semantically-unrelated documents from surfacing.
 
 ---
 
@@ -121,23 +136,37 @@ IDF-based rarity scoring: `log((N + 1) / (df(t) + smoothing))`
          ▼                           │
   ┌─────────────┐          ┌─────────┴──────────┐
   │ Stop-word   │          │   Genome Extractor  │
-  │  Stripping  │──────────│  (5-dim per window) │
-  └─────────────┘          └─────────────────────┘
+  │  Stripping  │──────────│  (6-dim per window) │
+  └─────────────┘          │  + genome cache      │
+                           └─────────────────────┘
                                      │
                            ┌─────────▼──────────┐
-                           │  GIN Pre-filter      │  ← PostgreSQL index
-                           │  @> trigram_hash     │    narrows to ~500 docs
+                           │  GIN Pre-filter      │  ← PostgreSQL JSONB index
+                           │  @> trigram_hash     │    narrows to ~1000 docs
+                           └─────────────────────┘
+                                     │
+                           ┌─────────▼──────────┐
+                           │  BM25 via ts_rank    │  ← Functional GIN index
+                           │  (parallel SQL)      │    on tsvector column
                            └─────────────────────┘
                                      │
                            ┌─────────▼──────────┐
                            │  Weighted Scoring    │
-                           │  5 dimensions        │
-                           │  configurable weights│
+                           │  6 dimensions        │
+                           │  vocabulary gate     │
+                           │  title boost         │
+                           └─────────────────────┘
+                                     │
+                           ┌─────────▼──────────┐
+                           │  Deduplication       │
+                           │  (group by title,    │
+                           │   keep best chunk)   │
                            └─────────────────────┘
                                      │
                            ┌─────────▼──────────┐
                            │  Ranked Results      │
                            │  + dimension scores  │
+                           │  + sub-chunks        │
                            └─────────────────────┘
 ```
 
@@ -149,16 +178,19 @@ File Upload / Text Paste
   Text Extraction (PDF/TXT/MD)
          │
          ▼
-  Chunking (150 words, 30-word overlap)
+  Sentence-boundary Chunking (150 words, last sentence carried over)
          │
          ▼
-  Corpus Stats Update (IDF)
+  Corpus Stats Update (IDF) — once per source document
          │
          ▼
-  Genome Extraction (5 dims × N windows)
+  Batch Genome Extraction (spaCy nlp.pipe across all chunks)
          │
          ▼
-  INSERT INTO documents (JSONB genome)
+  Batch INSERT INTO documents (JSONB genome)
+         │
+         ▼
+  Job status → "done" (async, polled by UI)
 ```
 
 ---
@@ -167,12 +199,12 @@ File Upload / Text Paste
 
 ```
 SemanticDNA/
-├── schema.sql                  # Database tables + GIN index
+├── schema.sql                  # Database tables + GIN indexes (auto-applied on startup)
 ├── requirements.txt
 ├── .env.example
 │
 ├── app/
-│   ├── main.py                 # FastAPI app + lifespan (pool init, spaCy warmup)
+│   ├── main.py                 # FastAPI app + lifespan (schema, pool init, spaCy warmup)
 │   ├── config.py               # Settings via pydantic-settings (.env)
 │   ├── database.py             # psycopg2 ThreadedConnectionPool
 │   ├── models.py               # Pydantic request/response models
@@ -180,24 +212,24 @@ SemanticDNA/
 │   ├── genome/                 # Core encoding pipeline
 │   │   ├── trigram.py          # MD5 hash of 3-word windows
 │   │   ├── phonetic.py         # Vowel-strip + consonant normalization
-│   │   ├── pos_tagger.py       # spaCy POS tags (singleton NLP model)
-│   │   ├── context_depth.py    # L1–L4 word specificity classifier
+│   │   ├── pos_tagger.py       # spaCy POS tags + lemmatization (singleton NLP model)
+│   │   ├── context_depth.py    # L1-L4 word specificity classifier
 │   │   ├── entropy.py          # IDF scoring + corpus_stats DB ops
-│   │   └── extractor.py        # Orchestrates all 5 dimensions → genome list
+│   │   └── extractor.py        # Orchestrates all dimensions; batch mode via nlp.pipe
 │   │
 │   ├── search/
-│   │   ├── indexer.py          # Document ingest pipeline
-│   │   └── searcher.py         # GIN pre-filter + weighted multi-dim scoring
+│   │   ├── indexer.py          # Document ingest pipeline (single + batch)
+│   │   └── searcher.py         # GIN pre-filter + BM25 + weighted scoring + dedup
 │   │
 │   ├── routes/
-│   │   ├── documents.py        # POST/GET/DELETE /documents, POST /documents/upload
-│   │   └── search.py           # POST+GET /search, GET /search/health
+│   │   ├── documents.py        # CRUD + async upload + job polling + similarity endpoint
+│   │   └── search.py           # POST+GET /search, /health, /analytics
 │   │
 │   └── static/
 │       └── index.html          # Single-page UI (vanilla HTML/CSS/JS)
 │
 └── scripts/
-    ├── setup_db.py             # Run schema.sql against the database
+    ├── setup_db.py             # Manual schema runner (optional — auto-runs on startup)
     └── seed_data.py            # Ingest 6 sample documents via the API
 ```
 
@@ -237,7 +269,7 @@ cp .env.example .env
 ```env
 DATABASE_URL=postgresql://postgres:your_password@localhost:5432/semanticdna
 SPACY_MODEL=en_core_web_sm
-GIN_CANDIDATE_LIMIT=500
+GIN_CANDIDATE_LIMIT=1000
 ENTROPY_SMOOTHING=0.5
 ```
 
@@ -252,27 +284,21 @@ $env:PGPASSWORD = "your_password"
 createdb -U postgres semanticdna
 ```
 
-### 5. Run the schema setup
-
-```bash
-python scripts/setup_db.py
-```
-
-This creates the `documents`, `corpus_stats`, and `corpus_meta` tables, and the GIN index.
-
-### 6. (Optional) Load sample documents
+### 5. (Optional) Load sample documents
 
 ```bash
 python scripts/seed_data.py
 ```
 
-Ingests 6 pre-built documents designed to exercise all 5 dimensions:
+Ingests 6 pre-built documents designed to exercise all dimensions:
 - TensorFlow XLA vulnerability (L4 depth, high entropy)
 - Quick Brown Fox (L1/L2 depth, low entropy)
 - Pharmacokinetics Overview (Latin roots, L3/L4 depth)
 - Misspelled Pharmakokenetics (tests phonetic dimension)
 - Neural Networks / GPU Clusters (tests POS + trigram)
 - Commercial Aviation Maintenance (cross-domain POS match)
+
+> **Note:** The database schema is applied automatically on every server startup. You do not need to run `setup_db.py` manually.
 
 ---
 
@@ -284,7 +310,8 @@ uvicorn app.main:app --reload
 
 Open **http://localhost:8000** in your browser.
 
-The server:
+On startup the server:
+- Applies the database schema automatically (idempotent — safe to run repeatedly)
 - Initializes the PostgreSQL connection pool
 - Warms up the spaCy NLP model (avoids cold-start latency on first request)
 - Serves the browser UI via `/static/index.html`
@@ -304,12 +331,16 @@ Type a query and press Enter or click **Search →**. Results appear below the h
 - **Paste Text tab:** Paste any text content directly
 - **Upload File tab:** Upload `.pdf`, `.txt`, or `.md` files
   - PDF text is extracted automatically via `pypdf`
-  - Files > 150 words are automatically **chunked** into overlapping segments for better retrieval
+  - Files are automatically **chunked** at sentence boundaries (150-word target) for better retrieval
+  - Ingestion happens asynchronously — a progress message polls until complete
 - Optionally provide a title; defaults to the filename for uploads
+- **Clear All** button removes all indexed documents and resets corpus stats
 
 **Right panel — Search:**
-- Same search bar synced with the hero
-- Results show total score + expandable dimension breakdown bars
+- Results show total score + **Show breakdown** (expandable dimension bars for all 6 dimensions)
+- **View full content** expands to show the complete chunk text
+- Multi-chunk documents show the best-matching chunk with a **Show other chunk(s)** toggle
+- **Doc similarity** is available via the API — see `/documents/{id}/similar`
 
 **Status pill (top nav):** Shows live document count and vocabulary size.
 
@@ -321,11 +352,14 @@ Type a query and press Enter or click **Search →**. Results appear below the h
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/documents` | Ingest plain text document |
-| `POST` | `/documents/upload` | Upload file (PDF/TXT/MD) — auto-chunked |
+| `POST` | `/documents` | Ingest plain text document (synchronous) |
+| `POST` | `/documents/upload` | Upload file (PDF/TXT/MD) — async, returns job_id |
+| `GET` | `/documents/jobs/{job_id}` | Poll async upload job status |
 | `GET` | `/documents` | List all documents (paginated) |
 | `GET` | `/documents/{id}` | Get document with full genome |
-| `DELETE` | `/documents/{id}` | Delete a document |
+| `GET` | `/documents/{id}/similar` | Find similar documents by genome |
+| `DELETE` | `/documents/{id}` | Delete document + decrement corpus stats |
+| `DELETE` | `/documents` | Delete all documents + reset corpus |
 
 **Ingest text:**
 ```bash
@@ -334,22 +368,20 @@ curl -X POST http://localhost:8000/documents \
   -d '{"content": "Your document text here", "title": "My Doc"}'
 ```
 
-**Upload file:**
+**Upload file (async):**
 ```bash
 curl -X POST http://localhost:8000/documents/upload \
   -F "file=@report.pdf" \
   -F "title=My Report"
+# Returns: {"job_id": "uuid", "status": "processing"}
+
+curl http://localhost:8000/documents/jobs/{job_id}
+# Returns: {"status": "done", "chunks_created": 4, "total_genes": 312}
 ```
 
-**Response:**
-```json
-{
-  "id": 1,
-  "title": "My Doc",
-  "content_preview": "Your document text here...",
-  "genome_length": 42,
-  "ingested_at": "2025-05-18T10:30:00Z"
-}
+**Find similar documents:**
+```bash
+curl http://localhost:8000/documents/5/similar?limit=5
 ```
 
 ---
@@ -361,6 +393,7 @@ curl -X POST http://localhost:8000/documents/upload \
 | `POST` | `/search` | Full search with body |
 | `GET` | `/search?q=...&limit=10` | Quick GET search |
 | `GET` | `/search/health` | Returns doc count + vocab size |
+| `GET` | `/search/analytics` | Query logs, top queries, avg latency |
 
 **POST search with custom weights:**
 ```bash
@@ -369,13 +402,14 @@ curl -X POST http://localhost:8000/search \
   -d '{
     "query": "trigram hash phrase matching",
     "limit": 10,
-    "min_score": 0.1,
+    "min_score": 0.05,
     "weights": {
       "trigram": 0.5,
-      "phonetic": 0.2,
+      "phonetic": 0.15,
       "pos_sequence": 0.15,
-      "context_depth": 0.1,
-      "entropy": 0.05
+      "context_depth": 0.08,
+      "entropy": 0.07,
+      "bm25": 0.05
     }
   }'
 ```
@@ -395,25 +429,24 @@ curl -X POST http://localhost:8000/search \
         "phonetic": 0.61,
         "pos_sequence": 0.67,
         "context_depth": 0.85,
-        "entropy": 0.93
+        "entropy": 0.93,
+        "bm25": 0.74,
+        "title_boost": 0.10
       },
-      "matched_trigrams": 3
+      "matched_trigrams": 3,
+      "chunks_matched": 2,
+      "sub_chunks": [...]
     }
   ],
-  "candidates_evaluated": 8,
-  "query_genome_length": 2
+  "candidates_evaluated": 18,
+  "query_genome_length": 4
 }
 ```
 
-**GET search (quick):**
+**Analytics:**
 ```bash
-curl "http://localhost:8000/search?q=neural+networks+computing&limit=5"
-```
-
-**Health check:**
-```bash
-curl http://localhost:8000/search/health
-# {"status":"ok","total_documents":14,"vocab_size":312}
+curl http://localhost:8000/search/analytics
+# Returns top queries, zero-result rate, avg latency, recent searches
 ```
 
 ---
@@ -429,7 +462,7 @@ The system is a **document retrieval engine**, not a Q&A chatbot. It finds relev
 | `entropy IDF rare terms` | `what is entropy score?` |
 | `neural networks GPU computing` | `tell me about neural networks` |
 
-**Why?** Question words (`what`, `is`, `how`, `why`) are automatically stripped before genome extraction. But using keywords directly produces more gene windows and higher trigram overlap scores.
+**Why?** Question words (`what`, `is`, `how`, `why`) are automatically stripped before genome extraction. Keywords directly produce more gene windows and higher trigram overlap scores.
 
 **Typo tolerance:** The phonetic dimension handles misspellings automatically.
 ```
@@ -441,7 +474,7 @@ The system is a **document retrieval engine**, not a Q&A chatbot. It finds relev
 ```
 "aircraft require maintenance schedules"
 → also matches "neural networks require computational resources"
-(same DET-NOUN-VERB-NOUN pattern)
+(same NOUN-VERB-NOUN-NOUN pattern)
 ```
 
 ---
@@ -454,18 +487,19 @@ All settings are in `.env`:
 |---|---|---|
 | `DATABASE_URL` | — | PostgreSQL connection string |
 | `SPACY_MODEL` | `en_core_web_sm` | spaCy model name |
-| `GIN_CANDIDATE_LIMIT` | `500` | Max candidates from GIN pre-filter |
+| `GIN_CANDIDATE_LIMIT` | `1000` | Max candidates from GIN pre-filter |
 | `ENTROPY_SMOOTHING` | `0.5` | Laplace smoothing for IDF scores |
 
-**Default dimension weights** (overridable per-query):
+**Default dimension weights** (overridable per-query via the `weights` field):
 
 | Dimension | Weight | Rationale |
 |---|---|---|
-| Trigram Hash | 40% | Strongest signal for semantic match |
-| Phonetic Code | 20% | Noise tolerance |
-| POS Sequence | 20% | Structure match |
-| Context Depth | 10% | Expertise level alignment |
-| Entropy Score | 10% | Rare-term boosting |
+| Trigram Hash | 35% | Strongest signal — exact phrase overlap |
+| BM25 | 13% | Keyword relevance via PostgreSQL ts_rank |
+| Phonetic Code | 17% | Typo and misspelling tolerance |
+| POS Sequence | 17% | Grammatical structure match |
+| Context Depth | 9% | Expertise level alignment |
+| Entropy Score | 9% | Rare-term boosting |
 
 ---
 
@@ -473,36 +507,49 @@ All settings are in `.env`:
 
 ### Phase 1 — GIN Pre-filter
 
-For each trigram hash in the query genome, one `@>` containment query is fired against the GIN index:
+For each trigram hash in the query genome, one `@>` containment query hits the JSONB GIN index:
 
 ```sql
 SELECT id FROM documents WHERE semantic_genome @> '[{"trigram_hash":"a3f8c21d"}]'::jsonb
 UNION
 SELECT id FROM documents WHERE semantic_genome @> '[{"trigram_hash":"9b8e3df2"}]'::jsonb
-LIMIT 500
+LIMIT 1000
 ```
 
-If GIN returns zero results (e.g., a misspelled query), the system falls back to scoring all documents — ensuring the phonetic and POS dimensions can still surface relevant results.
+If GIN returns zero results (e.g. a misspelled query), the system falls back to scoring all documents — ensuring the phonetic and POS dimensions can still surface relevant results.
 
-### Phase 2 — Weighted Scoring
+### Phase 2 — BM25 (parallel)
 
-Each candidate document is scored across 5 dimensions:
+Simultaneously, `ts_rank` is computed against a functional GIN index:
+
+```sql
+SELECT id, ts_rank(to_tsvector('english', coalesce(title,'') || ' ' || content),
+                   plainto_tsquery('english', $query)) AS bm25
+FROM documents WHERE id = ANY($candidate_ids)
+```
+
+### Phase 3 — Weighted Scoring + Gate
+
+Each candidate is scored across all 6 dimensions:
 
 ```
 Trigram Jaccard    = |query_hashes ∩ doc_hashes| / |query_hashes ∪ doc_hashes|
-
 Phonetic Jaccard   = shared phonetic codes / total phonetic codes
-                     (word-level, split on "-" for per-word comparison)
-
 POS Score          = avg(max(pos_similarity(qp, dp) for dp in doc) for qp in query)
-                     where pos_similarity = position-wise tag match ratio
-
 Context Depth      = 1.0 - |avg_query_depth - avg_doc_depth| / 3.0
-
 Entropy Alignment  = 1.0 - |avg_query_entropy - avg_doc_entropy| / max(both)
+BM25               = min(ts_rank × 10, 1.0)
+Title Boost        = +0.10 additive when query words appear in doc title
 
-Total = 0.40×trigram + 0.20×phonetic + 0.20×pos + 0.10×depth + 0.10×entropy
+Total = 0.35×trigram + 0.17×phonetic + 0.17×pos + 0.09×depth + 0.09×entropy + 0.13×bm25 + title_boost
+      (capped at 1.0)
 ```
+
+**Vocabulary signal gate:** result dropped if trigram = 0 AND phonetic ≤ 0.05 AND bm25 ≤ 0.01 AND title_boost = 0.
+
+### Phase 4 — Deduplication
+
+Chunks from the same source document (matched by base title, stripping `— Part N` suffixes) are collapsed: the highest-scoring chunk is the primary result; remaining chunks appear as expandable `sub_chunks`.
 
 ---
 

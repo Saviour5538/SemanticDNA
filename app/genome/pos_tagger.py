@@ -11,10 +11,14 @@ def get_nlp():
 
 
 def compute_all_pos_tags(text: str) -> tuple[list[str], list[str]]:
-    """Return (tokens, pos_tags) aligned lists for the given text."""
+    """Return (lemmas, pos_tags) aligned lists for the given text.
+
+    Lemmas normalise inflected forms so 'running', 'ran', 'runs' all
+    resolve to 'run', improving trigram and phonetic recall.
+    """
     nlp = get_nlp()
     doc = nlp(text)
-    tokens = [token.text for token in doc if not token.is_space]
+    tokens = [token.lemma_.lower() for token in doc if not token.is_space]
     pos_tags = [token.pos_ for token in doc if not token.is_space]
     return tokens, pos_tags
 
